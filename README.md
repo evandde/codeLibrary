@@ -1,2 +1,2 @@
-# codeLibrary
-Evandde's code library.
+# pyCodeLibrary
+Evandde's python Code library.
