@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.optimize
 import scipy.signal
+from sklearn import linear_model
 import matplotlib.pyplot as plt
 
 
@@ -20,6 +21,50 @@ def fitGEB(ene: np.ndarray, fwhm: np.ndarray):
     fwhm = np.append(fwhm, 0.)
     pars, cov = scipy.optimize.curve_fit(f=geb, xdata=ene, ydata=fwhm)
     return pars, cov
+
+
+def calibrateEne(x: np.ndarray, cnt: list):
+    if type(cnt) is np.ndarray:
+        cnt = [cnt]
+
+    calibPts = []
+    enes = [0.662, 1.173, 1.332]
+    k = 0
+
+    for n in range(len(cnt)):
+        y = cnt[n]
+        plt.plot(x, y)
+        plt.draw()
+
+        pts = plt.ginput(n=2)
+        xIdx = np.digitize(np.array([pts[0][0], pts[1][0]]), x)
+        peaks, _ = scipy.signal.find_peaks(
+            y[xIdx[0]:xIdx[1]], prominence=np.max(cnt)*0.1)
+        peaks += xIdx[0]
+        plt.plot(x[peaks], y[peaks], "xr")
+        plt.draw()
+        plt.show()
+
+        for i in range(len(peaks)):
+            # ene = float(input("Peak energy (MeV): ")); enes.append(ene)
+            ene = enes[k]
+            k += 1
+            calibPts.append((peaks[i], ene))
+
+    print("-- Selected (channel, energy) points --")
+    print(calibPts)
+    chPts = [[i[0]] for i in calibPts]
+    enePts = [i[1] for i in calibPts]
+    plt.plot(chPts, enePts, "xr")
+
+    model = linear_model.LinearRegression()
+    model.fit(chPts, enePts)
+    chtmp = [[i] for i in np.arange(2048)]
+    enetmp = model.predict(chtmp)
+    plt.plot(chtmp, enetmp)
+    plt.show()
+
+    return model
 
 
 def findBroadPeak(x: np.ndarray, y: np.ndarray, nPeaks=1):
