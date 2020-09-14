@@ -1,6 +1,6 @@
 import re
 import numpy as np
-from . import gamma_spectroscopy
+# import gamma_spectroscopy
 
 
 def meastime(filename):

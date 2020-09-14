@@ -3,6 +3,7 @@ import scipy.optimize
 import scipy.signal
 from sklearn import linear_model
 import matplotlib.pyplot as plt
+# import read_rawdata
 
 
 def geb(ene: np.ndarray, a: float, b: float, c: float):
@@ -26,7 +27,7 @@ def fit_geb(ene: np.ndarray, fwhm: np.ndarray):
     return pars, cov
 
 
-def calibrate_ene(x: np.ndarray, cnt: list):
+def calibrate_bycsco(x: np.ndarray, cnt: list):
     if type(cnt) is np.ndarray:
         cnt = [cnt]
 
@@ -64,6 +65,28 @@ def calibrate_ene(x: np.ndarray, cnt: list):
     model.fit(ch_pts, ene_pts)
     chtmp = [[i] for i in np.arange(2048)]
     enetmp = model.predict(chtmp)
+    plt.plot(chtmp, enetmp)
+    plt.show()
+
+    return model
+
+
+def calibrate_byeu152(eu152data):
+    x = np.arange(2048)
+    y = eu152data
+    peaks, _ = scipy.signal.find_peaks(y, prominence=y*0.3, height=np.max(y)*0.01)
+    peaks = peaks[1:] # ignore first peak (noise)
+    plt.plot(x, y)
+    plt.plot(x[peaks], y[peaks], "xr")
+    plt.show()
+
+    ch_pts = [[i] for i in peaks]
+    ene_pts = np.array([0.040, 0.122, 0.245, 0.344, 0.779, 0.964, 1.122, 1.408])
+    model = linear_model.LinearRegression()
+    model.fit(ch_pts, ene_pts)
+    chtmp = [[i] for i in x]
+    enetmp = model.predict(chtmp)
+    plt.plot(ch_pts, ene_pts, "xr")
     plt.plot(chtmp, enetmp)
     plt.show()
 
@@ -149,12 +172,29 @@ def find_broadpeak(x: np.ndarray, y: np.ndarray, npeaks=1):
 
 
 if __name__ == "__main__":
-    ene = np.array([0.662, 1.173, 1.332])
-    fwhm = np.array(
-        [0.048791998308218114, 0.06348642946583723, 0.06570230543136499])
-    pars, cov = fit_geb(ene, fwhm)
-    print(pars)
-    print(cov)
-    # plt.scatter(ene, fwhm)
-    # plt.plot(np.arange(0., 1.5, 0.1), geb(np.arange(0., 1.5, 0.1), *pars))
+    ene_eu152 = np.array([0.040, 0.122, 0.245, 0.344, 0.779, 0.964, 1.122, 1.408])
+    bkg = read_rawdata.load_tka("/home/evan/work/Other1_Gamma밀도계/rawdata/" + "20200908_Bkg_3600s.TKA")
+    eu152 = read_rawdata.load_tka("/home/evan/work/Other1_Gamma밀도계/rawdata/" + "20200908_CalibEu152_600s.TKA")
+    csco = read_rawdata.load_tka("/home/evan/work/Other1_Gamma밀도계/rawdata/" + "20200908_CalibCs137Co60_600s.TKA")
+    # plt.plot(bkg)
+    # plt.plot(eu152)
+    # plt.plot(csco)
     # plt.show()
+
+    x = np.arange(2048)
+    y = eu152 - bkg
+    peaks, _ = scipy.signal.find_peaks(y, prominence=y*0.3, height=np.max(y)*0.01)
+    peaks = peaks[1:]
+    plt.plot(x, y)
+    plt.plot(x[peaks], y[peaks], "xr")
+    plt.show()
+
+    ch_pts = [[i] for i in peaks]
+    ene_pts = ene_eu152
+    model = linear_model.LinearRegression()
+    model.fit(ch_pts, ene_pts)
+    chtmp = [[i] for i in np.arange(2048)]
+    enetmp = model.predict(chtmp)
+    plt.plot(ch_pts, ene_pts, "xr")
+    plt.plot(chtmp, enetmp)
+    plt.show()
