@@ -10,24 +10,24 @@ def geb(ene: np.ndarray, a: float, b: float, c: float):
     return fwhm
 
 
-def sampleNewEnebyGEB(ene: np.ndarray, a: float, b: float, c: float):
-    eneNew = np.random.normal(
+def sample_ene_geb(ene: np.ndarray, a: float, b: float, c: float):
+    ene_new = np.random.normal(
         ene, geb(ene, a, b, c) / (2 * np.sqrt(np.log(2))))
-    return eneNew
+    return ene_new
 
 
-def fitGEB(ene: np.ndarray, fwhm: np.ndarray):
+def fit_geb(ene: np.ndarray, fwhm: np.ndarray):
     ene = np.append(ene, 0.)
     fwhm = np.append(fwhm, 0.)
     pars, cov = scipy.optimize.curve_fit(f=geb, xdata=ene, ydata=fwhm)
     return pars, cov
 
 
-def calibrateEne(x: np.ndarray, cnt: list):
+def calibrate_ene(x: np.ndarray, cnt: list):
     if type(cnt) is np.ndarray:
         cnt = [cnt]
 
-    calibPts = []
+    calib_pts = []
     enes = [0.662, 1.173, 1.332]
     k = 0
 
@@ -37,10 +37,10 @@ def calibrateEne(x: np.ndarray, cnt: list):
         plt.draw()
 
         pts = plt.ginput(n=2)
-        xIdx = np.digitize(np.array([pts[0][0], pts[1][0]]), x)
+        x_idx = np.digitize(np.array([pts[0][0], pts[1][0]]), x)
         peaks, _ = scipy.signal.find_peaks(
-            y[xIdx[0]:xIdx[1]], prominence=np.max(cnt)*0.1)
-        peaks += xIdx[0]
+            y[x_idx[0]:x_idx[1]], prominence=np.max(cnt)*0.1)
+        peaks += x_idx[0]
         plt.plot(x[peaks], y[peaks], "xr")
         plt.draw()
         plt.show()
@@ -49,16 +49,16 @@ def calibrateEne(x: np.ndarray, cnt: list):
             # ene = float(input("Peak energy (MeV): ")); enes.append(ene)
             ene = enes[k]
             k += 1
-            calibPts.append((peaks[i], ene))
+            calib_pts.append((peaks[i], ene))
 
     print("-- Selected (channel, energy) points --")
-    print(calibPts)
-    chPts = [[i[0]] for i in calibPts]
-    enePts = [i[1] for i in calibPts]
-    plt.plot(chPts, enePts, "xr")
+    print(calib_pts)
+    ch_pts = [[i[0]] for i in calib_pts]
+    ene_pts = [i[1] for i in calib_pts]
+    plt.plot(ch_pts, ene_pts, "xr")
 
     model = linear_model.LinearRegression()
-    model.fit(chPts, enePts)
+    model.fit(ch_pts, ene_pts)
     chtmp = [[i] for i in np.arange(2048)]
     enetmp = model.predict(chtmp)
     plt.plot(chtmp, enetmp)
@@ -67,11 +67,11 @@ def calibrateEne(x: np.ndarray, cnt: list):
     return model
 
 
-def findBroadPeak(x: np.ndarray, y: np.ndarray, nPeaks=1):
-    def G1PeakP1Bkg(x, p0, p1, a, b, c):
+def find_broadpeak(x: np.ndarray, y: np.ndarray, peaks=1):
+    def g1peak_p1bkg(x, p0, p1, a, b, c):
         return a * np.exp(-(x-b)**2 / (2*(c**2))) + (p0 + p1*x)
 
-    def G2PeakP1Bkg(x, p0, p1, a1, b1, c1, a2, b2, c2):
+    def g2peak_p1bkg(x, p0, p1, a1, b1, c1, a2, b2, c2):
         return a1 * np.exp(-(x-b1)**2 / (2*(c1**2))) + a2 * np.exp(-(x-b2)**2 / (2*(c2**2))) + (p0 + p1*x)
 
     plt.plot(x, y)
@@ -79,19 +79,19 @@ def findBroadPeak(x: np.ndarray, y: np.ndarray, nPeaks=1):
 
     pts = plt.ginput(n=2)
 
-    xIdx = np.digitize(np.array([pts[0][0], pts[1][0]]), x)
+    x_idx = np.digitize(np.array([pts[0][0], pts[1][0]]), x)
 
-    xSel = x[xIdx[0]:xIdx[1]]
-    ySel = y[xIdx[0]:xIdx[1]]
+    x_sel = x[x_idx[0]:x_idx[1]]
+    y_sel = y[x_idx[0]:x_idx[1]]
 
-    peaks, _ = scipy.signal.find_peaks(ySel, prominence=np.max(y)*0.1)
+    peaks, _ = scipy.signal.find_peaks(y_sel, prominence=np.max(y)*0.1)
 
-    if nPeaks == 1:
-        pars, cov = scipy.optimize.curve_fit(f=G1PeakP1Bkg, xdata=xSel, ydata=ySel,
-                                             p0=[1., -1., ySel[peaks[0]],
-                                                 xSel[peaks[0]], 0.01],
-                                             bounds=([0., -np.inf, 0., xSel[0], 0.],
-                                                     [np.inf, 0., np.inf, xSel[-1], xSel[-1]-xSel[0]]))
+    if peaks == 1:
+        pars, cov = scipy.optimize.curve_fit(f=g1peak_p1bkg, xdata=x_sel, ydata=y_sel,
+                                             p0=[1., -1., y_sel[peaks[0]],
+                                                 x_sel[peaks[0]], 0.01],
+                                             bounds=([0., -np.inf, 0., x_sel[0], 0.],
+                                                     [np.inf, 0., np.inf, x_sel[-1], x_sel[-1]-x_sel[0]]))
         a = np.sqrt(2 * np.pi) * 0.997
         A = pars[2]
         sA = np.sqrt(cov[2, 2])
@@ -103,15 +103,15 @@ def findBroadPeak(x: np.ndarray, y: np.ndarray, nPeaks=1):
                                               (sB / B) ** 2 + 2 * (sAB / (A * B))))
         fwhm = pars[4] * 2 * np.sqrt(2 * np.log(2))
 
-        plt.plot(xSel, G1PeakP1Bkg(xSel, *pars))
+        plt.plot(x_sel, g1peak_p1bkg(x_sel, *pars))
         plt.draw()
 
-    elif nPeaks == 2:
-        pars, cov = scipy.optimize.curve_fit(f=G2PeakP1Bkg, xdata=xSel, ydata=ySel,
-                                             p0=[1., -1., ySel[peaks[0]], xSel[peaks[0]],
-                                                 0.01, ySel[peaks[1]], xSel[peaks[1]], 0.01],
-                                             bounds=([0., -np.inf, 0., xSel[0], 0., 0., xSel[int(xSel.size/2)], 0.],
-                                                     [np.inf, 0., np.inf, xSel[int(xSel.size/2)], (xSel[-1]-xSel[0])/2, np.inf, xSel[-1], (xSel[-1]-xSel[0])/2]))
+    elif peaks == 2:
+        pars, cov = scipy.optimize.curve_fit(f=g2peak_p1bkg, xdata=x_sel, ydata=y_sel,
+                                             p0=[1., -1., y_sel[peaks[0]], x_sel[peaks[0]],
+                                                 0.01, y_sel[peaks[1]], x_sel[peaks[1]], 0.01],
+                                             bounds=([0., -np.inf, 0., x_sel[0], 0., 0., x_sel[int(x_sel.size/2)], 0.],
+                                                     [np.inf, 0., np.inf, x_sel[int(x_sel.size/2)], (x_sel[-1]-x_sel[0])/2, np.inf, x_sel[-1], (x_sel[-1]-x_sel[0])/2]))
         a = np.sqrt(2 * np.pi) * 0.997
         A = pars[2]
         sA = np.sqrt(cov[2, 2])
@@ -137,7 +137,7 @@ def findBroadPeak(x: np.ndarray, y: np.ndarray, nPeaks=1):
         areaErr = [areaErr1, areaErr2]
         fwhm = [fwhm1, fwhm2]
 
-        plt.plot(xSel, G2PeakP1Bkg(xSel, *pars))
+        plt.plot(x_sel, g2peak_p1bkg(x_sel, *pars))
         plt.draw()
 
     plt.show()
@@ -149,7 +149,7 @@ if __name__ == "__main__":
     ene = np.array([0.662, 1.173, 1.332])
     fwhm = np.array(
         [0.048791998308218114, 0.06348642946583723, 0.06570230543136499])
-    pars, cov = fitGEB(ene, fwhm)
+    pars, cov = fit_geb(ene, fwhm)
     print(pars)
     print(cov)
     plt.scatter(ene, fwhm)
