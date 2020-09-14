@@ -6,13 +6,16 @@ import matplotlib.pyplot as plt
 
 
 def geb(ene: np.ndarray, a: float, b: float, c: float):
-    fwhm = a + b * np.sqrt(ene + c * ene ** 2)  # in MeV
+    in_sqrt = ene + c * ene ** 2
+    in_sqrt[np.where(in_sqrt < 0.)] = 0.
+    fwhm = a + b * np.sqrt(in_sqrt)  # in MeV
     return fwhm
 
 
 def sample_ene_geb(ene: np.ndarray, a: float, b: float, c: float):
-    ene_new = np.random.normal(
-        ene, geb(ene, a, b, c) / (2 * np.sqrt(np.log(2))))
+    std = geb(ene, a, b, c) / (2 * np.sqrt(np.log(2)))
+    std[np.where(std < 0.)] = 0.
+    ene_new = np.random.normal(ene, std)
     return ene_new
 
 
@@ -67,7 +70,7 @@ def calibrate_ene(x: np.ndarray, cnt: list):
     return model
 
 
-def find_broadpeak(x: np.ndarray, y: np.ndarray, peaks=1):
+def find_broadpeak(x: np.ndarray, y: np.ndarray, npeaks=1):
     def g1peak_p1bkg(x, p0, p1, a, b, c):
         return a * np.exp(-(x-b)**2 / (2*(c**2))) + (p0 + p1*x)
 
@@ -86,7 +89,7 @@ def find_broadpeak(x: np.ndarray, y: np.ndarray, peaks=1):
 
     peaks, _ = scipy.signal.find_peaks(y_sel, prominence=np.max(y)*0.1)
 
-    if peaks == 1:
+    if npeaks == 1:
         pars, cov = scipy.optimize.curve_fit(f=g1peak_p1bkg, xdata=x_sel, ydata=y_sel,
                                              p0=[1., -1., y_sel[peaks[0]],
                                                  x_sel[peaks[0]], 0.01],
@@ -106,7 +109,7 @@ def find_broadpeak(x: np.ndarray, y: np.ndarray, peaks=1):
         plt.plot(x_sel, g1peak_p1bkg(x_sel, *pars))
         plt.draw()
 
-    elif peaks == 2:
+    elif npeaks == 2:
         pars, cov = scipy.optimize.curve_fit(f=g2peak_p1bkg, xdata=x_sel, ydata=y_sel,
                                              p0=[1., -1., y_sel[peaks[0]], x_sel[peaks[0]],
                                                  0.01, y_sel[peaks[1]], x_sel[peaks[1]], 0.01],
@@ -152,6 +155,6 @@ if __name__ == "__main__":
     pars, cov = fit_geb(ene, fwhm)
     print(pars)
     print(cov)
-    plt.scatter(ene, fwhm)
-    plt.plot(np.arange(0., 1.5, 0.1), geb(np.arange(0., 1.5, 0.1), *pars))
-    plt.show()
+    # plt.scatter(ene, fwhm)
+    # plt.plot(np.arange(0., 1.5, 0.1), geb(np.arange(0., 1.5, 0.1), *pars))
+    # plt.show()
