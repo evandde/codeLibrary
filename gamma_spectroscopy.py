@@ -71,26 +71,34 @@ def calibrate_bycsco(x: np.ndarray, cnt: list):
     return model
 
 
-def calibrate_byeu152(eu152data):
+def calibrate_byeu152(eu152data, fig=True):
     x = np.arange(2048)
     y = eu152data
     peaks, _ = scipy.signal.find_peaks(y, prominence=y*0.3, height=np.max(y)*0.01)
     peaks = peaks[1:] # ignore first peak (noise)
-    plt.plot(x, y)
-    plt.plot(x[peaks], y[peaks], "xr")
-    plt.show()
+    if fig:
+        plt.plot(x, y)
+        plt.plot(x[peaks], y[peaks], "xr")
+        plt.show()
 
-    ch_pts = [[i] for i in peaks]
+    ch_pts = peaks.reshape(-1, 1)
     ene_pts = np.array([0.040, 0.122, 0.245, 0.344, 0.779, 0.964, 1.122, 1.408])
     model = linear_model.LinearRegression()
     model.fit(ch_pts, ene_pts)
-    chtmp = [[i] for i in x]
+    chtmp = x.reshape(-1, 1)
     enetmp = model.predict(chtmp)
-    plt.plot(ch_pts, ene_pts, "xr")
-    plt.plot(chtmp, enetmp)
-    plt.show()
+    if fig:
+        plt.plot(ch_pts, ene_pts, "xr")
+        plt.plot(chtmp, enetmp)
+        plt.show()
 
-    return model
+    rslt_half = scipy.signal.peak_widths(y, peaks, rel_height=0.5)
+    ene_half_left = model.predict(rslt_half[2].reshape(-1, 1))
+    ene_half_right = model.predict(rslt_half[3].reshape(-1, 1))
+    fwhms = ene_half_right - ene_half_left
+    geb_pars, _ = fit_geb(ene_pts, fwhms)
+
+    return model, geb_pars
 
 
 def find_broadpeak(x: np.ndarray, y: np.ndarray, npeaks=1):

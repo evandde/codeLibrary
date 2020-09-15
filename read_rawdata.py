@@ -1,6 +1,6 @@
 import re
 import numpy as np
-# import gamma_spectroscopy
+from . import gamma_spectroscopy
 
 
 def meastime(filename):
@@ -26,11 +26,10 @@ def load_tka(filename):
     return data_cps
 
 
-def load_simul_data(filename):
+def load_simul_data(filename, geb_pars=[0., 0., 0.]):
     data = np.loadtxt(filename, skiprows=1)
     edep_data = data[:, 1]
-    # edep_data_new = gamma_spectroscopy.sample_ene_geb(edep_data, 1.22369657e-05, 6.09542015e-02, -1.00390113e-01)
-    edep_data_new = gamma_spectroscopy.sample_ene_geb(edep_data, -0.00148391,  0.06320691, -0.102377)
+    edep_data_new = gamma_spectroscopy.sample_ene_geb(edep_data, *geb_pars)
     hist, ene_axis = np.histogram(edep_data_new, bins=np.arange(0., 2., 0.01))
     data_cps = np.append(hist, 0.) / meastime(filename) / 0.01
 
