@@ -74,15 +74,17 @@ def calibrate_bycsco(x: np.ndarray, cnt: list):
 def calibrate_byeu152(eu152data, fig=True):
     x = np.arange(2048)
     y = eu152data
-    peaks, _ = scipy.signal.find_peaks(y, prominence=y*0.3, height=np.max(y)*0.01)
-    peaks = peaks[1:] # ignore first peak (noise)
+    peaks, _ = scipy.signal.find_peaks(
+        y, prominence=y*0.3, height=np.max(y)*0.01)
+    peaks = peaks[1:]  # ignore first peak (noise)
     if fig:
         plt.plot(x, y)
         plt.plot(x[peaks], y[peaks], "xr")
         plt.show()
 
     ch_pts = peaks.reshape(-1, 1)
-    ene_pts = np.array([0.040, 0.122, 0.245, 0.344, 0.779, 0.964, 1.122, 1.408])
+    ene_pts = np.array([0.040, 0.122, 0.245, 0.344,
+                        0.779, 0.964, 1.122, 1.408])
     model = linear_model.LinearRegression()
     model.fit(ch_pts, ene_pts)
     chtmp = x.reshape(-1, 1)
@@ -101,32 +103,66 @@ def calibrate_byeu152(eu152data, fig=True):
     return model, geb_pars
 
 
-def find_broadpeak(x: np.ndarray, y: np.ndarray, npeaks=1):
+def find_broadpeak2(x: np.ndarray, y: np.ndarray, npeaks=0, x_roi=[]):
+    # plt.rc('font', size=16, weight='bold')
+    # plt.rc('legend', fontsize=13)
+    # plt.figure(num=None, figsize=(8, 6), facecolor='w', edgecolor='k')
+
+    plt.plot(x, y, 'r')
+    plt.draw()
+
+    if x_roi:
+        x_idx = np.digitize(x_roi, x)
+        x_sel = x[x_idx[0]:x_idx[2]]
+        y_sel1 = y[x_idx[0]:x_idx[1]]
+        y_sel2 = y[x_idx[1]:x_idx[2]]
+    else:
+        pts = plt.ginput(n=3)
+        x_idx = np.digitize(np.array([pts[0][0], pts[1][0], pts[2][0]]), x)
+        x_sel = x[x_idx[0]:x_idx[2]]
+        y_sel1 = y[x_idx[0]:x_idx[1]]
+        y_sel2 = y[x_idx[1]:x_idx[2]]
+
+    plt.vlines(x_roi, 0., np.max(y), colors='k', linestyles='--')
+
+    area1 = (np.sum(y_sel1) - y_sel1.shape[0]/2.*(y_sel1[0]+y_sel1[-1]))*(x_sel[1]-x_sel[0])
+    area2 = (np.sum(y_sel2) - y_sel2.shape[0]/2.*(y_sel2[0]+y_sel2[-1]))*(x_sel[1]-x_sel[0])
+    area = np.array([area1, area2])
+    areaErr = np.array([0., 0.])
+
+    return area, areaErr, 0., 0.
+
+
+def find_broadpeak(x: np.ndarray, y: np.ndarray, npeaks=0, x_roi=[]):
     def g1peak_p1bkg(x, p0, p1, a, b, c):
         return a * np.exp(-(x-b)**2 / (2*(c**2))) + (p0 + p1*x)
 
     def g2peak_p1bkg(x, p0, p1, a1, b1, c1, a2, b2, c2):
         return a1 * np.exp(-(x-b1)**2 / (2*(c1**2))) + a2 * np.exp(-(x-b2)**2 / (2*(c2**2))) + (p0 + p1*x)
 
-    plt.plot(x, y)
+    plt.plot(x, y, 'r')
     plt.draw()
 
-    pts = plt.ginput(n=2)
+    if x_roi:
+        x_idx = np.digitize(x_roi, x)
+        x_sel = x[x_idx[0]:x_idx[1]]
+        y_sel = y[x_idx[0]:x_idx[1]]
+    else:
+        pts = plt.ginput(n=2)
+        x_idx = np.digitize(np.array([pts[0][0], pts[1][0]]), x)
+        x_sel = x[x_idx[0]:x_idx[1]]
+        y_sel = y[x_idx[0]:x_idx[1]]
 
-    x_idx = np.digitize(np.array([pts[0][0], pts[1][0]]), x)
-
-    x_sel = x[x_idx[0]:x_idx[1]]
-    y_sel = y[x_idx[0]:x_idx[1]]
-
-    peaks, _ = scipy.signal.find_peaks(y_sel, prominence=np.max(y)*0.1)
-
+    peaks, _ = scipy.signal.find_peaks(y_sel, prominence=y_sel*0.3, height=np.max(y_sel)*0.5)
+    npeaks = peaks.shape[0] if npeaks == 0 else npeaks
+    
     if npeaks == 1:
         pars, cov = scipy.optimize.curve_fit(f=g1peak_p1bkg, xdata=x_sel, ydata=y_sel,
                                              p0=[1., -1., y_sel[peaks[0]],
                                                  x_sel[peaks[0]], 0.01],
                                              bounds=([0., -np.inf, 0., x_sel[0], 0.],
                                                      [np.inf, 0., np.inf, x_sel[-1], x_sel[-1]-x_sel[0]]))
-        a = np.sqrt(2 * np.pi) * 0.997
+        a = np.sqrt(2 * np.pi)
         A = pars[2]
         sA = np.sqrt(cov[2, 2])
         B = pars[4]
@@ -146,7 +182,7 @@ def find_broadpeak(x: np.ndarray, y: np.ndarray, npeaks=1):
                                                  0.01, y_sel[peaks[1]], x_sel[peaks[1]], 0.01],
                                              bounds=([0., -np.inf, 0., x_sel[0], 0., 0., x_sel[int(x_sel.size/2)], 0.],
                                                      [np.inf, 0., np.inf, x_sel[int(x_sel.size/2)], (x_sel[-1]-x_sel[0])/2, np.inf, x_sel[-1], (x_sel[-1]-x_sel[0])/2]))
-        a = np.sqrt(2 * np.pi) * 0.997
+        a = np.sqrt(2 * np.pi)
         A = pars[2]
         sA = np.sqrt(cov[2, 2])
         B = pars[4]
@@ -171,19 +207,23 @@ def find_broadpeak(x: np.ndarray, y: np.ndarray, npeaks=1):
         areaErr = [areaErr1, areaErr2]
         fwhm = [fwhm1, fwhm2]
 
-        plt.plot(x_sel, g2peak_p1bkg(x_sel, *pars))
+        plt.plot(x_sel, g2peak_p1bkg(x_sel, *pars), 'k')
         plt.draw()
 
-    plt.show()
+    # plt.show()
 
     return area, areaErr, fwhm, pars
 
 
 if __name__ == "__main__":
-    ene_eu152 = np.array([0.040, 0.122, 0.245, 0.344, 0.779, 0.964, 1.122, 1.408])
-    bkg = read_rawdata.load_tka("/home/evan/work/Other1_Gamma밀도계/rawdata/" + "20200908_Bkg_3600s.TKA")
-    eu152 = read_rawdata.load_tka("/home/evan/work/Other1_Gamma밀도계/rawdata/" + "20200908_CalibEu152_600s.TKA")
-    csco = read_rawdata.load_tka("/home/evan/work/Other1_Gamma밀도계/rawdata/" + "20200908_CalibCs137Co60_600s.TKA")
+    ene_eu152 = np.array(
+        [0.040, 0.122, 0.245, 0.344, 0.779, 0.964, 1.122, 1.408])
+    bkg = read_rawdata.load_tka(
+        "/home/evan/work/Other1_Gamma밀도계/rawdata/" + "20200908_Bkg_3600s.TKA")
+    eu152 = read_rawdata.load_tka(
+        "/home/evan/work/Other1_Gamma밀도계/rawdata/" + "20200908_CalibEu152_600s.TKA")
+    csco = read_rawdata.load_tka(
+        "/home/evan/work/Other1_Gamma밀도계/rawdata/" + "20200908_CalibCs137Co60_600s.TKA")
     # plt.plot(bkg)
     # plt.plot(eu152)
     # plt.plot(csco)
@@ -191,7 +231,8 @@ if __name__ == "__main__":
 
     x = np.arange(2048)
     y = eu152 - bkg
-    peaks, _ = scipy.signal.find_peaks(y, prominence=y*0.3, height=np.max(y)*0.01)
+    peaks, _ = scipy.signal.find_peaks(
+        y, prominence=y*0.3, height=np.max(y)*0.01)
     peaks = peaks[1:]
     plt.plot(x, y)
     plt.plot(x[peaks], y[peaks], "xr")
