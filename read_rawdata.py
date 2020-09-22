@@ -30,8 +30,18 @@ def load_simul_data(filename, geb_pars=[0., 0., 0.]):
     data = np.loadtxt(filename, skiprows=1)
     edep_data = data[:, 1]
     edep_data_new = gamma_spectroscopy.sample_ene_geb(edep_data, *geb_pars)
-    hist, ene_axis = np.histogram(edep_data_new, bins=np.arange(0., 2., 0.01))
-    data_cps = np.append(hist, 0.) / meastime(filename) / 0.01
+    hist, ene_axis = np.histogram(edep_data_new, bins=np.arange(0., 2., 0.001))
+    data_cps = np.append(hist, 0.) / meastime(filename) / 0.001
+
+    return data_cps, ene_axis
+
+
+def load_simul_data2(filename, geb_pars=[0., 0., 0.]):
+    data = np.loadtxt(filename, skiprows=1)
+    edep_data = data[:, 1]
+    edep_data_new = gamma_spectroscopy.sample_ene_geb(edep_data, *geb_pars)
+    hist, ene_axis = np.histogram(edep_data_new, bins=np.arange(0., 2., 0.001))
+    data_cps = np.append(hist, 0.) / 1e8 / 0.001
 
     return data_cps, ene_axis
 
