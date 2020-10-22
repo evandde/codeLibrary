@@ -100,7 +100,8 @@ class Spectrum_data:
 
     def smooth_savgol(self, nch: int, order: int):
         new_cnt = signal.savgol_filter(self.__cnt, nch, order)
-        rslt = Spectrum_data(self.__ch, new_cnt, self.__u_cnt)
+        new_u_cnt = np.zeros(self.__u_cnt.shape)
+        rslt = Spectrum_data(self.__ch, new_cnt, new_u_cnt)
         return rslt
 
     # print
@@ -114,7 +115,7 @@ class Spectrum_data:
 
 
 def search_peak(data: Spectrum_data, significance: float):
-    data_2ndder = data.smooth_savgol(15, 3).derivative().derivative()
+    data_2ndder = data.derivative().derivative().smooth_savgol(51, 3).derivative()
     
     fig, ax1 = plt.subplots()
     ax2 = ax1.twinx()
